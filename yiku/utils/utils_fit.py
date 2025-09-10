@@ -8,6 +8,8 @@ from yiku.nets.loss import (CE_Loss, Dice_loss, Focal_Loss, Bootstrapped_CELoss)
 from yiku.nets.training_utils import weights_init, set_optimizer_lr
 # from tqdm import tqdm
 from collections import OrderedDict
+
+from yiku.utils.torch_utils import get_mem
 from yiku.utils.utils import get_lr
 from yiku.utils.utils_metrics import f_score
 
@@ -134,14 +136,15 @@ class SegmentationMetric(object):
 
 
 def fit_one_epoch(model_train, model, loss_history, eval_callback, optimizer, epoch, epoch_step, epoch_step_val, gen,
-                  gen_val, Epoch, cuda, dice_loss, focal_loss, cls_weights, num_classes, \
+                  gen_val, Epoch, device, dice_loss, focal_loss, cls_weights, num_classes, \
                   fp16, scaler, save_period, save_dir, local_rank=0):
     total_loss = 0
     total_f_score = 0
 
     val_loss = 0
     val_f_score = 0
-
+    cuda=device=="cuda"
+    xpu=device=="xpu"
     if local_rank == 0:
         rich_pbar = Progress(SpinnerColumn(),
                              "🐱", "{task.description}",
@@ -172,6 +175,11 @@ def fit_one_epoch(model_train, model, loss_history, eval_callback, optimizer, ep
                 pngs = pngs.cuda(local_rank)
                 labels = labels.cuda(local_rank)
                 weights = weights.cuda(local_rank)
+            if xpu:
+                imgs = imgs.to("xpu")
+                pngs = pngs.to("xpu")
+                labels = labels.to("xpu")
+                weights = weights.to("xpu")
         # ----------------------#
         #   清零梯度
         # ----------------------#
@@ -238,7 +246,7 @@ def fit_one_epoch(model_train, model, loss_history, eval_callback, optimizer, ep
 
         total_loss += loss.item()
         total_f_score += _f_score.item()
-        mem = torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0
+        mem = get_mem(device=device)
 
         if local_rank == 0:
             rich_pbar.update(task1, total_loss=total_loss / (iteration + 1),
@@ -280,7 +288,11 @@ def fit_one_epoch(model_train, model, loss_history, eval_callback, optimizer, ep
                 pngs = pngs.cuda(local_rank)
                 labels = labels.cuda(local_rank)
                 weights = weights.cuda(local_rank)
-
+            if xpu:
+                imgs = imgs.to("xpu")
+                pngs = pngs.to("xpu")
+                labels = labels.to("xpu")
+                weights = weights.to("xpu")
             # ----------------------#
             #   前向传播
             # ----------------------#

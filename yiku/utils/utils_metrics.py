@@ -7,14 +7,12 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
-from distutils.version import LooseVersion
+from yiku.utils.LooseVersion import LooseVersion
 
 try:
     from rich import print
 except ImportError:
     import warnings
-
-    warnings.filterwarnings('ignore', message="Setuptools is replacing distutils.", category=UserWarning)
     from pip._vendor.rich import print
 
 

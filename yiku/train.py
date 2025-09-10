@@ -8,7 +8,7 @@ import torch.distributed as dist
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from yiku.nets.model.Labs.labs import Labs
-from utils.check import check_amp
+from utils.check import check_gpu
 from yiku.nets.training_utils import (get_lr_scheduler, set_optimizer_lr,
                                      weights_init)
 from utils.callbacks import LossHistory, EvalCallback
@@ -171,7 +171,9 @@ def main():
     #   Cuda    是否使用Cuda
     #           没有GPU可以设置成False
     # ---------------------------------#
-    cuda = torch.cuda.is_available()
+    _c=check_gpu()
+    cuda = _c["device"]=="cuda"
+    xpu = _c["device"]=="xpu"
     if cuda:
         import torch.backends.cudnn as cudnn
     else:
@@ -196,7 +198,7 @@ def main():
     #   fp16        是否使用混合精度训练
     #               可减少约一半的显存、需要pytorch1.7.1以上
     # ---------------------------------------------------------------------#
-    fp16 = cuda and check_amp() and fp16
+    fp16 = cuda and _c["amp"] and fp16
     # ----------------------------------------------------------------------------------------------------------------------------#
     #   pretrained      是否使用主干网络的预训练权重，此处使用的是主干的权重，因此是在模型构建的时候进行加载的。
     #                   如果设置了model_path，则主干的权值无需加载，pretrained的值无意义。
@@ -296,17 +298,17 @@ def main():
     # ------------------------------------------------------#
     #   设置用到的显卡
     # ------------------------------------------------------#
-    ngpus_per_node = torch.cuda.device_count()
+    ngpus_per_node = getattr(torch,_c["device"]).device_count()
     if distributed:
         dist.init_process_group(backend="nccl")
         local_rank = int(os.environ["LOCAL_RANK"])
         rank = int(os.environ["RANK"])
-        device = torch.device("cuda", local_rank)
+        device = torch.device(_c["device"], local_rank)
         if local_rank == 0:
             print(f"[{os.getpid()}] (rank = {rank}, local_rank = {local_rank}) training...")
             print("Gpu Device Count : ", ngpus_per_node)
     else:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = torch.device(_c["device"] if getattr(torch,_c["device"]).is_available() else 'cpu')
         local_rank = 0
 
     # ----------------------------------------------------#
@@ -393,9 +395,8 @@ def main():
     #   因此torch1.2这里显示"could not be resolve"
     # ------------------------------------------------------------------#
     if fp16:
-        from torch.cuda.amp import GradScaler as GradScaler
-
-        scaler = GradScaler()
+        from torch.amp import GradScaler
+        scaler = GradScaler(device=device.type)
     else:
         scaler = None
 
@@ -638,7 +639,7 @@ def main():
             set_optimizer_lr(optimizer, lr_scheduler_func, epoch)
 
             fit_one_epoch(model_train, model, loss_history, eval_callback, optimizer, epoch,
-                          epoch_step, epoch_step_val, gen, gen_val, unfreeze_epoch, cuda, dice_loss, focal_loss,
+                          epoch_step, epoch_step_val, gen, gen_val, unfreeze_epoch, _c["device"], dice_loss, focal_loss,
                           cls_weights, num_classes, fp16, scaler, save_period, save_dir, local_rank)
             c = Console()
             c.rule()
