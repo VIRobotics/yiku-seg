@@ -198,7 +198,7 @@ def main():
     #   fp16        是否使用混合精度训练
     #               可减少约一半的显存、需要pytorch1.7.1以上
     # ---------------------------------------------------------------------#
-    fp16 = cuda and _c["amp"] and fp16
+    fp16 =  _c["amp"] and fp16
     # ----------------------------------------------------------------------------------------------------------------------------#
     #   pretrained      是否使用主干网络的预训练权重，此处使用的是主干的权重，因此是在模型构建的时候进行加载的。
     #                   如果设置了model_path，则主干的权值无需加载，pretrained的值无意义。
@@ -428,6 +428,8 @@ def main():
             model_train = torch.nn.DataParallel(model)
             cudnn.benchmark = True
             model_train = model_train.cuda()
+    if xpu:
+        model_train = model_train.to(device=device)
 
     if CUSTOM_DS:
         DS_File, DS_Class = CUSTOM_DS.split(":")

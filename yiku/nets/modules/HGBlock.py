@@ -1,5 +1,5 @@
 from torch import nn
-from nets.modules.block import Conv,LightConv
+from yiku.nets.modules.block import Conv,LightConv
 import torch
 import torch.nn.functional as F
 class HGStem(nn.Module):

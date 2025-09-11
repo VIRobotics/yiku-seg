@@ -18,7 +18,7 @@ def check_gpu():
     if hasattr(torch,"cuda") and torch.cuda.is_available():
         d.update({"device":"cuda"})
     elif hasattr(torch,"xpu") and torch.xpu.is_available():
-        d["xpu"] = True
+        d["device"] = "xpu"
     if d["device"] == "cuda":
         d["amp"] = check_amp()
     elif d["device"] == "xpu":
@@ -32,7 +32,8 @@ def check_gpu():
                 )
                 d["amp"] = False
         if d["amp"]:
-            d["amp"] = check_amp()
+            d["amp"] = check_amp(d["device"])
+    return d
 
 
 

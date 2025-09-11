@@ -44,13 +44,10 @@ except ImportError:
 
 
 class SegmentationMetric(object):
-    def __init__(self, numClass, cuda=True):
+    def __init__(self, numClass, device):
         self.numClass = numClass
-        self._cuda = cuda
-        if self._cuda:
-            self.device = torch.device('cuda:0')
-        else:
-            self.device = torch.device('cpu')
+
+        self.device = torch.device(device)
 
         self.confusionMatrix = torch.zeros((self.numClass,) * 2, device=self.device)  # 混淆矩阵（空）
 
@@ -73,7 +70,7 @@ class SegmentationMetric(object):
         """
         classAcc = self.classPixelAccuracy()
         meanAcc = classAcc[classAcc < float('inf')].mean()  # np.nanmean 求平均值，nan表示遇到Nan类型，其值取为0
-        if self._cuda:
+        if self.device.type != 'cpu':
             return meanAcc.cpu()
         return meanAcc  # 返回单个值，如：np.nanmean([0.90, 0.80, 0.96, nan, nan]) = (0.90 + 0.80 + 0.96） / 3 =  0.89
 
@@ -89,7 +86,7 @@ class SegmentationMetric(object):
     def meanIntersectionOverUnion(self):
         IoU = self.IntersectionOverUnion()
         mIoU = IoU[IoU < float('inf')].mean()  # 求各类别IoU的平均
-        if self._cuda:
+        if self.device.type != 'cpu':
             return mIoU.cpu()
         else:
             return mIoU
@@ -121,7 +118,7 @@ class SegmentationMetric(object):
                 torch.sum(self.confusion_matrix, axis=1) + torch.sum(self.confusion_matrix, axis=0) -
                 torch.diag(self.confusion_matrix))
         FWIoU = (freq[freq > 0] * iu[freq > 0]).sum()
-        if self._cuda:
+        if self.device.type != 'cpu':
             return FWIoU.cpu()
         return FWIoU
 
@@ -145,13 +142,14 @@ def fit_one_epoch(model_train, model, loss_history, eval_callback, optimizer, ep
     val_f_score = 0
     cuda=device=="cuda"
     xpu=device=="xpu"
+    print("device:{} selected".format(device))
     if local_rank == 0:
         rich_pbar = Progress(SpinnerColumn(),
                              "🐱", "{task.description}",
                              BarColumn(),
                              TaskProgressColumn(),
                              TimeElapsedColumn(),
-                             "[bold]GPU mem:", '[bold]{task.fields[gmem]:.3g}',
+                             "[bold]GPU mem:", '[bold]{task.fields[gmem]:.3g}GB',
                              TimeRemainingColumn(), '📈', '[bold orange1]total_loss:',
                              '[bold]{task.fields[total_loss]:.3f}',
                              "  ", '[bold dark_magenta]f_score:',
@@ -213,8 +211,8 @@ def fit_one_epoch(model_train, model, loss_history, eval_callback, optimizer, ep
             loss.backward()
             optimizer.step()
         else:
-            from torch.cuda.amp import autocast
-            with autocast():
+            from torch.amp import autocast
+            with autocast(device):
                 # ----------------------#
                 #   前向传播
                 # ----------------------#
@@ -246,7 +244,7 @@ def fit_one_epoch(model_train, model, loss_history, eval_callback, optimizer, ep
 
         total_loss += loss.item()
         total_f_score += _f_score.item()
-        mem = get_mem(device=device)
+        mem,total = get_mem(device=device)
 
         if local_rank == 0:
             rich_pbar.update(task1, total_loss=total_loss / (iteration + 1),
@@ -274,7 +272,7 @@ def fit_one_epoch(model_train, model, loss_history, eval_callback, optimizer, ep
                                    f_score=float('nan'), miou=float('nan'))
         rich_pbar.start()
 
-    metrics = SegmentationMetric(numClass=num_classes)
+    metrics = SegmentationMetric(numClass=num_classes,device=device)
     mious = []
     mpas = []
     for iteration, batch in enumerate(gen_val):

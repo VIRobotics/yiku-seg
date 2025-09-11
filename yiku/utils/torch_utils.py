@@ -7,7 +7,7 @@ def get_mem(device="cuda",fraction=False):
         if fraction:
             total = torch.cuda.get_device_properties(device=device).total_memory
     elif device == "xpu":
-        mem = torch.xpu.memory_allocated() / 1E9
+        mem = torch.xpu.memory_reserved() / 1E9
         if fraction:
             total = torch.xpu.get_device_properties(device=device).total_memory
     return mem, total
