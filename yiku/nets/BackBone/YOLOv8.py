@@ -5,7 +5,7 @@ try:
     from ultralytics.models import YOLO
 except ImportError as e:
     pass
-from PATH import WTS_STORAGE_DIR
+from yiku.PATH import WTS_STORAGE_DIR
 class YOLOv8_backbone(nn.Module):   #### Not Recommand (Low mIOU)
     def __init__(self, *args, **kwargs):
         if "model" not in kwargs.keys():

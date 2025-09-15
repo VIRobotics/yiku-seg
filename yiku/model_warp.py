@@ -12,13 +12,7 @@ from torch import nn
 from yiku.nets.model.Labs.labs import Labs
 from yiku.data.process import cvtColor, preprocess_input, resize_image
 from yiku.utils.utils import show_config
-USE_INTEL=False
-try:
-    import torch_directml
-    I_Device = torch_directml.device()
-    USE_INTEL=True
-except ImportError:
-    pass
+from yiku.utils.check import check_gpu
 
 # -----------------------------------------------------------------------------------#
 #   使用自己训练好的模型预测需要修改3个参数
@@ -64,7 +58,7 @@ class Wrapper(object):
         #   是否使用Cuda
         #   没有GPU可以设置成False
         # -------------------------------#
-        "cuda": True,
+        "device": None,
 
         # 使用的高特征解码模块：
         # ASPP 原版空洞卷积
@@ -131,19 +125,17 @@ class Wrapper(object):
             self.net = Labs(num_classes=self.num_classes, backbone=self.backbone,
                            downsample_factor=self.downsample_factor, pretrained=True,header=self.pp,img_sz=self.input_shape)
 
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.net.load_state_dict(torch.load(self.model_path, map_location=device))
+        self.device = torch.device(check_gpu()["device"])
+        self.net.load_state_dict(torch.load(self.model_path, map_location=self.device))
         self.net = self.net.eval()
         if hasattr(self.net,"fuse"):
             self.net.fuse()
         print('{} model, and classes loaded.'.format(self.model_path))
         if not onnx:
-            if self.cuda:
+            if self.device.type == "cuda":
                 self.net = nn.DataParallel(self.net)
-                if USE_INTEL:
-                    self.net = self.net.to(I_Device)
-                else:
-                    self.net = self.net.cuda()
+            self.net = self.net.to(device=self.device)
+
 
     # ---------------------------------------------------#
     #   检测图片
@@ -172,11 +164,7 @@ class Wrapper(object):
 
         with torch.no_grad():
             images = torch.from_numpy(image_data)
-            if self.cuda:
-                if USE_INTEL:
-                    images = images.to(I_Device)
-                else:
-                    images = images.cuda()
+            images = images.to(self.device)
 
 
             warmup_data=torch.rand(1,3,*self.input_shape)
@@ -279,11 +267,7 @@ class Wrapper(object):
 
         with torch.no_grad():
             images = torch.from_numpy(image_data)
-            if self.cuda:
-                if USE_INTEL:
-                    images = images.to(I_Device)
-                else:
-                    images = images.cuda()
+            images = images.to(self.device)
 
             # ---------------------------------------------------#
             #   图片传入网络进行预测

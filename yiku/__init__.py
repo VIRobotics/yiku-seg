@@ -5,4 +5,4 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 del ROOT
 
-__version__ = "0.1.5a4"
+__version__ = "0.2.0+xpu"

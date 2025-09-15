@@ -6,10 +6,10 @@ from yiku.nets.BackBone import mobilenetv3s, mobilenetv3l, hgnetv2l, hgnetv2x, x
 from yiku.nets.Head import aspp, transformer
 from yiku.utils.utils import fuse_conv_and_bn
 
-try:
-    from nets.BackBone import yolov8m, yolov8s
-except ImportError:
-    print("Use YOLOv8 Backbone need run pip install ultralytics==8.0.154")
+# try:
+#     from nets.BackBone import yolov8m, yolov8s
+# except ImportError:
+#     print("Use YOLOv8 Backbone need run pip install ultralytics==8.0.154")
 
 
 class Labs(nn.Module):
